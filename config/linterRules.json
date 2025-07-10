@@ -1,0 +1,20 @@
+{
+  "eslint": {
+    "enabled": true,
+    "rules": {
+      "no-console": "error",
+      "@typescript-eslint/no-explicit-any": "warn"
+    }
+  },
+  "flake8": {
+    "enabled": true,
+    "ignore": ["E203", "W503"]
+  },
+  "dotnetFormat": {
+    "enabled": false
+  },
+  "checkstyle": {
+    "enabled": true,
+    "configFile": "/google_checks.xml"
+  }
+}
