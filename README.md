@@ -1,4 +1,4 @@
-````markdown
+
 # AI Code Reviewer
 
 A GitHub pull-request reviewer powered by OpenAI and multiple linters.  
