@@ -160,7 +160,7 @@ Render `<Dashboard />` in your React app. It reads `public/review-report.json` a
 
 ## License
 
-MIT © Your Name
+MIT © Cristian Mendoza
 
 ```
 ```
