@@ -1,95 +1,71 @@
-import bodyParser from 'body-parser'
-import os from 'os'
-import path from 'path'
-import dotenv from 'dotenv'
-import axios from 'axios'
-import { execSync } from 'child_process'
-import { parsePatch } from 'diff'
-import { handleWebhook } from './github/webhookHandler.js'
-import express from 'express'
+// File: src/server.js
+import express from 'express';
+import bodyParser from 'body-parser';
+import { analyzeCodeSnippet, analyzeOwaspSnippet } from './analyzers/aiAnalyzer.js';
 
-dotenv.config()
+const app = express();
+app.use(bodyParser.json());
 
-const app = express()
-app.use(bodyParser.json())
+/**
+ * Extracts the Bearer token from Authorization header.
+ */
+function getUserKey(req) {
+  const auth = (req.header('Authorization') || '').match(/^Bearer\s+(.+)$/i);
+  return auth ? auth[1] : null;
+}
 
-app.get('/', (_req, res) => {
-res.send('AI Code Reviewer is up!')
-})
+/**
+ * POST /review
+ * Style & Best Practices analysis of a code snippet.
+ */
+app.post('/review', async (req, res) => {
+  const userKey = getUserKey(req);
+  if (!userKey) {
+    return res.status(401).json({ error: 'Missing Authorization header' });
+  }
+  const { code } = req.body;
+  if (typeof code !== 'string' || !code.trim()) {
+    return res.status(400).json({ error: 'Missing or empty code' });
+  }
 
-app.post('/webhook', async (req, res) => {
-try {
-const event = req.headers['x-github-event']
-if (event !== 'pull_request') return res.status(200).send('Ignored event')
-
-const payload = req.body
-const owner = payload.repository.owner.login
-const repo = payload.repository.name
-const prNumber = payload.pull_request.number
-const headSha = payload.pull_request.head.sha
-const base = payload.pull_request.base.ref
-
-const workspace = os.tmpdir()
-const clonePath = path.join(workspace, `repo-pr-${prNumber}`)
-const comments = await handleWebhook(payload, workspace)
-if (!comments.length) return res.status(200).send('No comments')
-
-execSync(`git -C ${clonePath} fetch origin ${base}`, { stdio: 'ignore' })
-
-let inlinePosted = false
-for (const c of comments) {
-  const pathNormalized = c.path.replace(/\\/g, '/')
-  let patchText
   try {
-    patchText = execSync(
-      `git -C ${clonePath} diff origin/${base}...HEAD -- ${pathNormalized}`,
-      { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
-    )
-  } catch {
-    continue
+    const suggestions = await analyzeCodeSnippet(code, userKey);
+    return res.json(suggestions);
+  } catch (err) {
+    console.error('Error in /review:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-  const files = parsePatch(patchText)
-  const file = files.find(f => {
-    const normalized = f.newFileName.replace(/^b\//, '').replace(/\\/g, '/')
-    return normalized === pathNormalized || normalized.endsWith(pathNormalized)
-  })
-  if (!file) continue
+});
 
-  let position = 0, found = false
-  for (const hunk of file.hunks) {
-    for (const line of hunk.lines) {
-      position++
-      if (line.newNumber === c.line) { found = true; break }
-    }
-    if (found) break
+/**
+ * POST /owasp-review
+ * OWASP Top 10 security analysis of a code snippet.
+ */
+app.post('/owasp-review', async (req, res) => {
+  const userKey = getUserKey(req);
+  if (!userKey) {
+    return res.status(401).json({ error: 'Missing Authorization header' });
   }
-  if (!found) continue
+  const { code } = req.body;
+  if (typeof code !== 'string' || !code.trim()) {
+    return res.status(400).json({ error: 'Missing or empty code' });
+  }
 
-  await axios.post(
-    `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/comments`,
-    { body: c.message, commit_id: headSha, path: pathNormalized, position, side: 'RIGHT' },
-    { headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` } }
-  )
-  inlinePosted = true
-}
+  try {
+    const findings = await analyzeOwaspSnippet(code, userKey);
+    return res.json(findings);
+  } catch (err) {
+    console.error('Error in /owasp-review:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-if (!inlinePosted) {
-  const summary = comments
-    .map(c => `- **${c.path.replace(/\\/g,'/')}** (línea ${c.line}): ${c.message}`)
-    .join('\n')
-  await axios.post(
-    `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`,
-    { body: summary },
-    { headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` } }
-  )
-}
+// Simple healthcheck
+app.get('/', (_req, res) => {
+  res.send('AI Code Reviewer API is running');
+});
 
-res.status(200).send('Comments posted')
-} catch (err) {
-console.error('Error handling webhook:', err)
-res.status(500).send('Server error')
-}
-})
-
-const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server listening on port ${PORT}`);
+});

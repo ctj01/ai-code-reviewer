@@ -1,0 +1,55 @@
+{
+  "name": "ai-code-reviewer-extension",
+  "displayName": "AI Code Reviewer",
+  "publisher": "Ctj01",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.50.0"
+  },
+  "description": "VS Code extension for AI-powered code review and OWASP security analysis.",
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onCommand:aiReviewer.reviewSelection",
+    "onCommand:aiReviewer.owaspReview"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiReviewer.reviewSelection",
+        "title": "AI Code Review: Style & Best Practices"
+      },
+      {
+        "command": "aiReviewer.owaspReview",
+        "title": "AI Security Review (OWASP)"
+      }
+    ],
+    "configuration": {
+      "title": "AI Code Reviewer",
+      "properties": {
+        "aiReviewer.endpoint": {
+          "type": "string",
+          "default": "http://localhost:3000/review",
+          "description": "URL of the code review (style) endpoint"
+        },
+        "aiReviewer.owaspEndpoint": {
+          "type": "string",
+          "default": "http://localhost:3000/owasp-review",
+          "description": "URL of the OWASP security review endpoint"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "typescript": "^4.5.4",
+    "@types/node": "^14.14.37",
+    "@types/vscode": "^1.50.0",
+    "vscode-test": "^1.4.0"
+  }
+}

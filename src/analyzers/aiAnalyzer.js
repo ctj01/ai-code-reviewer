@@ -1,70 +1,69 @@
-// src/analyzers/aiAnalyzer.js
-import { execSync } from 'child_process'
-import axios from 'axios'
-import path from 'path'
-import dotenv from 'dotenv'
+// File: src/analyzers/aiAnalyzer.js
+import axios from 'axios';
 
-dotenv.config()
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY
-if (!OPENAI_API_KEY) {
-  throw new Error('Missing OPENAI_API_KEY in environment')
+/** Extract JSON array text from AI response. */
+function extractJSON(text) {
+  const fence = text.match(/```json([\s\S]*?)```/i);
+  if (fence) return fence[1].trim();
+  const arr = text.match(/\[([\s\S]*?)\]/);
+  if (arr) return '[' + arr[1] + ']';
+  return text;
 }
 
-/**
- * Analyze a git diff using OpenAI's API to provide code review suggestions.
- * @param {string} repoPath - Path to the cloned repository.
- * @param {Object} payload - GitHub/GitLab webhook payload containing pull request details.
- * @returns {Promise<Array<{path: string, line: number, message: string}>>}
- */
-export async function handleAIAnalysis(repoPath, payload) {
-  const baseBranch = payload.pull_request?.base.ref || payload.object_attributes?.target_branch || 'main'
-  const diffCmd = `git -C ${repoPath} diff origin/${baseBranch}...HEAD`
-  const diff = execSync(diffCmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 })
-
-const systemPrompt = `You are an expert code reviewer. Analyze the following git diff and provide concise suggestions focusing on:
-- Readability improvements
-- Design patterns and best practices
-- Potential security vulnerabilities
-- Style and conventions
-
-Return a JSON array of objects with: path (relative file path), line (line number in the diff hunk), message (suggestion).`
-
-  const userPrompt = diff
-
-  // Llamar a la API de OpenAI
-  const response = await axios.post(
+export async function analyzeCodeSnippet(code, openaiKey) {
+  const systemPrompt = `You are an expert code reviewer. Analyze this code snippet and return ONLY a JSON array of objects [{"line":<number>,"message":"..."}].`;
+  const { data } = await axios.post(
     'https://api.openai.com/v1/chat/completions',
     {
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user',   content: code }
       ],
-      temperature: 0.2,
-      max_tokens: 1000
+      max_tokens: 500
     },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`
-      }
-    }
-  )
+    { headers: { Authorization: `Bearer ${openaiKey}` } }
+  );
 
-  // Parsear la respuesta
-  let comments = []
+  const raw = data.choices?.[0]?.message?.content || '';
+  const jsonText = extractJSON(raw);
   try {
-    const text = response.data.choices[0].message.content
-    comments = JSON.parse(text)
-  } catch (err) {
-    console.error('Error parsing AI response:', err)
-    return []
+    return JSON.parse(jsonText).map(c => ({
+      line:   typeof c.line === 'number' ? c.line : null,
+      message: c.message || ''
+    }));
+  } catch {
+    console.error('Failed to parse code snippet JSON:', raw);
+    throw new Error('Invalid AI response format');
   }
+}
 
-  return comments.map(c => ({
-    path: path.relative(repoPath, path.join(repoPath, c.path)),
-    line: c.line,
-    message: c.message
-  }))
+export async function analyzeOwaspSnippet(code, openaiKey) {
+  const systemPrompt = `You are an OWASP Top 10 security expert. Analyze this snippet and return ONLY a JSON array [{"category":"A1-Injection","line":<number>,"message":"..."}].`;
+  const { data } = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: code }
+      ],
+      max_tokens: 300,
+      temperature: 0
+    },
+    { headers: { Authorization: `Bearer ${openaiKey}` } }
+  );
+
+  const raw = data.choices?.[0]?.message?.content || '';
+  const jsonText = extractJSON(raw);
+  try {
+    return JSON.parse(jsonText).map(c => ({
+      category: c.category,
+      line:     typeof c.line === 'number' ? c.line : null,
+      message:  c.message || ''
+    }));
+  } catch {
+    console.error('Failed to parse OWASP JSON:', raw);
+    throw new Error('Invalid AI response format');
+  }
 }
