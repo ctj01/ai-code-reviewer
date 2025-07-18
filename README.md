@@ -1,4 +1,4 @@
-````markdown
+
 # AI Code Reviewer
 
 A GitHub pull-request reviewer powered by OpenAI and multiple linters.  
@@ -160,7 +160,7 @@ Render `<Dashboard />` in your React app. It reads `public/review-report.json` a
 
 ## License
 
-MIT © Your Name
+MIT © Cristian Mendoza
 
 ```
 ```
