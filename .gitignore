@@ -21,6 +21,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Extension files
+*.vsix
+
 # Build output
 dist/
 build/
@@ -36,6 +39,10 @@ temp/
 # Generated reports
 review-report.json
 lint-report.json
+
+# Test and debug files
+extension/test-*.js
+extension/debug-*.js
 
 # NPM lockfile (optional, if you use yarn/pnpm instead)
 # package-lock.json

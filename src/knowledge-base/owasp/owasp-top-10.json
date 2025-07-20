@@ -1,0 +1,374 @@
+{
+  "owasp_top_10_2021": {
+    "A01_broken_access_control": {
+      "title": "Broken Access Control",
+      "description": "Restrictions on what authenticated users are allowed to do are often not properly enforced.",
+      "severity": "HIGH",
+      "cwe_mappings": ["CWE-22", "CWE-23", "CWE-35", "CWE-59", "CWE-200", "CWE-201", "CWE-219", "CWE-264", "CWE-275", "CWE-276", "CWE-284", "CWE-285", "CWE-352", "CWE-359", "CWE-377", "CWE-402", "CWE-425", "CWE-441", "CWE-497", "CWE-538", "CWE-540", "CWE-548", "CWE-552", "CWE-566", "CWE-601", "CWE-639", "CWE-651", "CWE-668", "CWE-706", "CWE-862", "CWE-863", "CWE-913", "CWE-922", "CWE-1275"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "app\\.(get|post|put|delete)\\(['\"`][^'`\"]*['\"`]\\s*,\\s*(?!.*auth|.*middleware)[^)]*\\)",
+          "description": "Route without authentication middleware",
+          "example": "app.get('/admin', (req, res) => { ... })",
+          "fix": "app.get('/admin', authenticateMiddleware, (req, res) => { ... })"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "if\\s+user\\.is_admin\\s*==\\s*(True|False)",
+          "description": "Direct admin role check without proper authorization",
+          "example": "if user.is_admin == True:",
+          "fix": "if check_admin_permission(user, resource):"
+        },
+        {
+          "type": "ast",
+          "language": "java",
+          "pattern": "MethodCallExpression[name='hasRole' and arguments.size() == 1]",
+          "description": "Simple role check without resource-specific authorization",
+          "example": "@PreAuthorize(\"hasRole('ADMIN')\")",
+          "fix": "@PreAuthorize(\"hasRole('ADMIN') and hasPermission(#resource, 'write')\")"
+        }
+      ],
+      "common_scenarios": [
+        "Violation of the principle of least privilege or deny by default",
+        "Bypassing access control checks by modifying the URL, internal application state, or the HTML page",
+        "Permitting viewing or editing someone else's account, by providing its unique identifier",
+        "Accessing API with missing access controls for POST, PUT and DELETE",
+        "Elevation of privilege",
+        "Metadata manipulation, such as replaying or tampering with a JSON Web Token (JWT) access control token",
+        "CORS misconfiguration allows API access from unauthorized/untrusted origins",
+        "Force browsing to authenticated pages as an unauthenticated user or to privileged pages as a standard user"
+      ]
+    },
+    "A02_cryptographic_failures": {
+      "title": "Cryptographic Failures",
+      "description": "Failures related to cryptography which often leads to sensitive data exposure.",
+      "severity": "HIGH",
+      "cwe_mappings": ["CWE-259", "CWE-327", "CWE-331"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "crypto\\.createHash\\(['\"`]md5['\"`]\\)",
+          "description": "Use of weak MD5 hash algorithm",
+          "example": "crypto.createHash('md5')",
+          "fix": "crypto.createHash('sha256')"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "hashlib\\.(md5|sha1)\\(",
+          "description": "Use of weak hash algorithms MD5 or SHA1",
+          "example": "hashlib.md5(password.encode())",
+          "fix": "hashlib.sha256(password.encode())"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "password\\s*=\\s*['\"`][^'`\"]*['\"`]",
+          "description": "Hardcoded password in source code",
+          "example": "password = 'mypassword123'",
+          "fix": "password = os.getenv('DB_PASSWORD')"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "Math\\.random\\(\\)",
+          "description": "Use of non-cryptographically secure random number generator",
+          "example": "const token = Math.random().toString(36)",
+          "fix": "const token = crypto.randomBytes(32).toString('hex')"
+        }
+      ],
+      "common_scenarios": [
+        "Transmission of data in clear text protocols such as HTTP, SMTP, and FTP",
+        "Use of old or weak cryptographic algorithms or protocols",
+        "Use of default crypto keys, weak crypto keys, or weak key management",
+        "Encryption not enforced, e.g., any user agent (browser) security directives or headers missing",
+        "The received server certificate and the trust chain not properly validated",
+        "Initialization vectors are reused, not random, or not unpredictable for encryption modes",
+        "Passwords used as cryptographic keys without password base key derivation function",
+        "Randomness used for cryptographic purposes not designed to meet cryptographic requirements"
+      ]
+    },
+    "A03_injection": {
+      "title": "Injection",
+      "description": "Injection flaws occur when untrusted data is sent to an interpreter as part of a command or query.",
+      "severity": "HIGH",
+      "cwe_mappings": ["CWE-79", "CWE-89", "CWE-73", "CWE-93", "CWE-94", "CWE-95", "CWE-96", "CWE-97", "CWE-98"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "\\$\\{[^}]*\\$\\{[^}]*req\\.(body|query|params)[^}]*\\}[^}]*\\}",
+          "description": "Template injection with user input",
+          "example": "`SELECT * FROM users WHERE id = ${req.params.id}`",
+          "fix": "Use parameterized queries or prepared statements"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "cursor\\.execute\\(['\"`][^'`\"]*%s[^'`\"]*['\"`]\\s*%",
+          "description": "SQL injection via string formatting",
+          "example": "cursor.execute(\"SELECT * FROM users WHERE id = %s\" % user_id)",
+          "fix": "cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "eval\\(.*req\\.(body|query|params)",
+          "description": "Code injection via eval with user input",
+          "example": "eval(req.body.expression)",
+          "fix": "Use a safe expression evaluator or avoid eval entirely"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "innerHTML\\s*=\\s*.*\\+.*req\\.(body|query|params)",
+          "description": "XSS via innerHTML with user input",
+          "example": "element.innerHTML = 'Hello ' + req.query.name",
+          "fix": "element.textContent = 'Hello ' + sanitize(req.query.name)"
+        }
+      ],
+      "common_scenarios": [
+        "User-supplied data is not validated, filtered, or sanitized by the application",
+        "Dynamic queries or non-parameterized calls without context-aware escaping",
+        "Hostile data used within object-relational mapping (ORM) search parameters",
+        "Hostile data directly used or concatenated",
+        "Hostile data within dynamic queries, commands, or stored procedures"
+      ]
+    },
+    "A04_insecure_design": {
+      "title": "Insecure Design",
+      "description": "Insecure design represents missing or ineffective control design.",
+      "severity": "HIGH",
+      "cwe_mappings": ["CWE-209", "CWE-256", "CWE-501", "CWE-522", "CWE-525", "CWE-539", "CWE-579", "CWE-598", "CWE-602", "CWE-642", "CWE-646", "CWE-650", "CWE-653", "CWE-656", "CWE-657", "CWE-799", "CWE-807", "CWE-840", "CWE-841", "CWE-927", "CWE-1021", "CWE-1173"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "setTimeout\\(.*login.*\\d{1,3}\\)",
+          "description": "Insufficient rate limiting on login attempts",
+          "example": "setTimeout(resetLoginAttempts, 100)",
+          "fix": "Implement exponential backoff and account lockout"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "password.*length.*[<>]=?\\s*[1-7]\\b",
+          "description": "Weak password policy - too short minimum length",
+          "example": "if (password.length >= 6)",
+          "fix": "if (password.length >= 12 && isComplexPassword(password))"
+        }
+      ],
+      "common_scenarios": [
+        "Missing or insufficient security controls",
+        "Lack of business logic validation",
+        "Missing rate limiting",
+        "Insufficient logging and monitoring",
+        "Weak authentication mechanisms"
+      ]
+    },
+    "A05_security_misconfiguration": {
+      "title": "Security Misconfiguration",
+      "description": "Security misconfiguration is commonly a result of insecure default configurations.",
+      "severity": "MEDIUM",
+      "cwe_mappings": ["CWE-16", "CWE-2", "CWE-388", "CWE-11", "CWE-13", "CWE-15", "CWE-5", "CWE-209", "CWE-200", "CWE-266", "CWE-732", "CWE-209", "CWE-1188"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "app\\.use\\(.*cors\\(\\{.*origin:\\s*['\"`]\\*['\"`]",
+          "description": "CORS configured to allow all origins",
+          "example": "app.use(cors({ origin: '*' }))",
+          "fix": "app.use(cors({ origin: ['https://trusted-domain.com'] }))"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "(NODE_ENV|ENV|ENVIRONMENT).*=.*['\"`]production['\"`].*debug.*true",
+          "description": "Debug mode enabled in production",
+          "example": "NODE_ENV=production DEBUG=true",
+          "fix": "NODE_ENV=production DEBUG=false"
+        }
+      ],
+      "common_scenarios": [
+        "Missing appropriate security hardening across any part of the application stack",
+        "Improperly configured permissions on cloud services",
+        "Unnecessary features enabled or installed",
+        "Default accounts and passwords still enabled and unchanged",
+        "Error handling reveals stack traces or overly informative error messages",
+        "Latest security features disabled or not configured securely",
+        "Security settings in application servers, frameworks, libraries, databases not set to secure values"
+      ]
+    },
+    "A06_vulnerable_components": {
+      "title": "Vulnerable and Outdated Components",
+      "description": "Components run with the same privileges as the application itself.",
+      "severity": "HIGH",
+      "cwe_mappings": ["CWE-1104", "CWE-937", "CWE-1035"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "json",
+          "pattern": "\"lodash\":\\s*\"[^\"]*[0-3]\\.[0-9]+\\.[0-9]+\"",
+          "description": "Vulnerable version of lodash library",
+          "example": "\"lodash\": \"3.10.1\"",
+          "fix": "\"lodash\": \"^4.17.21\""
+        },
+        {
+          "type": "regex",
+          "language": "json",
+          "pattern": "\"express\":\\s*\"[^\"]*[0-3]\\.[0-9]+\\.[0-9]+\"",
+          "description": "Outdated version of Express.js",
+          "example": "\"express\": \"3.21.2\"",
+          "fix": "\"express\": \"^4.18.0\""
+        }
+      ],
+      "common_scenarios": [
+        "If you do not know the versions of all components you use",
+        "If the software is vulnerable, unsupported, or out of date",
+        "If you do not scan for vulnerabilities regularly",
+        "If you do not fix or upgrade the underlying platform, frameworks, and dependencies in a risk-based, timely fashion",
+        "If software developers do not test the compatibility of updated, upgraded, or patched libraries",
+        "If you do not secure the components' configurations"
+      ]
+    },
+    "A07_identification_authentication_failures": {
+      "title": "Identification and Authentication Failures",
+      "description": "Confirmation of the user's identity, authentication, and session management is critical.",
+      "severity": "HIGH",
+      "cwe_mappings": ["CWE-297", "CWE-287", "CWE-384", "CWE-295", "CWE-521", "CWE-613", "CWE-620", "CWE-640"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "bcrypt\\.compare.*\\|\\||password\\s*===?\\s*req",
+          "description": "Unsafe password comparison",
+          "example": "if (bcrypt.compare(password, hash) || password === 'admin123')",
+          "fix": "if (await bcrypt.compare(password, hash))"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "session.*timeout.*[>]\\s*[0-9]{5,}",
+          "description": "Excessive session timeout",
+          "example": "session.timeout = 86400000",
+          "fix": "session.timeout = 1800000 // 30 minutes"
+        }
+      ],
+      "common_scenarios": [
+        "Permits automated attacks such as credential stuffing",
+        "Permits brute force or other automated attacks",
+        "Permits default, weak, or well-known passwords",
+        "Uses weak or ineffective credential recovery and forgot-password processes",
+        "Uses plain text, encrypted, or weakly hashed passwords",
+        "Has missing or ineffective multi-factor authentication",
+        "Exposes session identifier in the URL",
+        "Reuse session identifier after successful login",
+        "Does not properly invalidate Session IDs"
+      ]
+    },
+    "A08_software_data_integrity_failures": {
+      "title": "Software and Data Integrity Failures",
+      "description": "Software and data integrity failures relate to code and infrastructure that does not protect against integrity violations.",
+      "severity": "MEDIUM",
+      "cwe_mappings": ["CWE-829", "CWE-494", "CWE-502"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "JSON\\.parse.*req\\.(body|query|params)",
+          "description": "Unsafe JSON parsing of user input",
+          "example": "JSON.parse(req.body.data)",
+          "fix": "Use a safe JSON parser with validation"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "pickle\\.loads?\\(",
+          "description": "Unsafe deserialization using pickle",
+          "example": "pickle.loads(user_data)",
+          "fix": "Use json.loads() or implement safe deserialization"
+        }
+      ],
+      "common_scenarios": [
+        "Applications rely upon plugins, libraries, or modules from untrusted sources",
+        "An insecure CI/CD pipeline allows the potential for unauthorized access",
+        "Auto-update functionality downloads updates without sufficient integrity verification",
+        "Objects or data encoded or serialized into a structure that an attacker can see and modify"
+      ]
+    },
+    "A09_security_logging_monitoring_failures": {
+      "title": "Security Logging and Monitoring Failures",
+      "description": "This category helps detect, escalate, and respond to active breaches.",
+      "severity": "MEDIUM",
+      "cwe_mappings": ["CWE-117", "CWE-223", "CWE-532", "CWE-778"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "console\\.log.*password|console\\.log.*token|console\\.log.*secret",
+          "description": "Sensitive information logged to console",
+          "example": "console.log('User password:', password)",
+          "fix": "Use proper logging framework and avoid logging sensitive data"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "catch\\s*\\([^)]*\\)\\s*\\{\\s*\\}",
+          "description": "Empty catch block - errors not logged",
+          "example": "try { ... } catch (e) { }",
+          "fix": "try { ... } catch (e) { logger.error('Error occurred', e); }"
+        }
+      ],
+      "common_scenarios": [
+        "Auditable events are not logged",
+        "Warnings and errors generate no, inadequate, or unclear log messages",
+        "Logs of applications and APIs are not monitored for suspicious activity",
+        "Logs are only stored locally",
+        "Appropriate alerting thresholds and response escalation processes are not in place",
+        "Penetration testing and scans do not trigger alerts",
+        "The application cannot detect, escalate, or alert for active attacks in real-time or near real-time"
+      ]
+    },
+    "A10_server_side_request_forgery": {
+      "title": "Server-Side Request Forgery (SSRF)",
+      "description": "SSRF flaws occur whenever a web application fetches a remote resource without validating the user-supplied URL.",
+      "severity": "MEDIUM",
+      "cwe_mappings": ["CWE-918"],
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "fetch\\(.*req\\.(body|query|params).*url",
+          "description": "Server-side request using user-controlled URL",
+          "example": "fetch(req.body.url)",
+          "fix": "Validate and whitelist allowed URLs before making requests"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "requests\\.(get|post)\\(.*request\\.(POST|GET)\\[",
+          "description": "HTTP request with user-controlled URL",
+          "example": "requests.get(request.POST['callback_url'])",
+          "fix": "Validate URL against whitelist before making request"
+        }
+      ],
+      "common_scenarios": [
+        "Port scan internal servers",
+        "Sensitive data exposure through error messages",
+        "Access metadata storage of cloud services",
+        "Compromise internal services"
+      ]
+    }
+  },
+  "metadata": {
+    "version": "2021",
+    "last_updated": "2025-01-20",
+    "source": "https://owasp.org/Top10/",
+    "total_vulnerabilities": 10,
+    "total_patterns": 23
+  }
+}

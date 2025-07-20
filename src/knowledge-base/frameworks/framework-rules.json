@@ -1,0 +1,233 @@
+{
+  "framework_specific_rules": {
+    "react": {
+      "title": "React Best Practices",
+      "description": "React-specific patterns and anti-patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "useState\\(\\[\\]\\)|useState\\(\\{\\}\\)",
+          "description": "Avoid using object/array literals in useState - causes unnecessary re-renders",
+          "example": "const [items, setItems] = useState([]);",
+          "fix": "const [items, setItems] = useState(() => []);",
+          "category": "react_performance"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "useEffect\\([^,]+\\)(?!,\\s*\\[)",
+          "description": "useEffect without dependency array runs on every render",
+          "example": "useEffect(() => { fetchData(); });",
+          "fix": "useEffect(() => { fetchData(); }, []);",
+          "category": "react_hooks"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "onClick=\\{[^}]*\\(\\)",
+          "description": "Function call in onClick creates new function on each render",
+          "example": "onClick={handleClick()}",
+          "fix": "onClick={handleClick} or onClick={() => handleClick()}",
+          "category": "react_performance"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "dangerouslySetInnerHTML",
+          "description": "dangerouslySetInnerHTML can lead to XSS attacks",
+          "example": "<div dangerouslySetInnerHTML={{__html: userContent}} />",
+          "fix": "Sanitize content or use safe rendering methods",
+          "category": "react_security"
+        }
+      ]
+    },
+    "node_express": {
+      "title": "Node.js & Express Patterns",
+      "description": "Node.js and Express.js best practices",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "app\\.use\\([^)]*\\)(?!.*helmet)",
+          "description": "Express app without security middleware (helmet)",
+          "example": "app.use(express.json());",
+          "fix": "app.use(helmet()); app.use(express.json());",
+          "category": "express_security"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "process\\.exit\\(\\d+\\)",
+          "description": "Avoid process.exit() in production - use proper error handling",
+          "example": "process.exit(1);",
+          "fix": "throw new Error('Application error') or proper shutdown sequence",
+          "category": "node_lifecycle"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "req\\.body(?![^;]*validation|[^;]*sanitize|[^;]*validate)",
+          "description": "Request body used without validation",
+          "example": "const userId = req.body.userId;",
+          "fix": "const userId = validateUserId(req.body.userId);",
+          "category": "express_validation"
+        }
+      ]
+    },
+    "django": {
+      "title": "Django Best Practices",
+      "description": "Django-specific security and performance patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "User\\.objects\\.get\\(",
+          "description": "User.objects.get() can raise DoesNotExist exception",
+          "example": "user = User.objects.get(id=user_id)",
+          "fix": "user = get_object_or_404(User, id=user_id)",
+          "category": "django_safety"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "HttpResponse\\([^)]*\\+[^)]*\\)",
+          "description": "String concatenation in HttpResponse - potential XSS",
+          "example": "return HttpResponse('Hello ' + user_name)",
+          "fix": "return HttpResponse(format_html('Hello {}', user_name))",
+          "category": "django_security"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "\\.raw\\(['\"][^'\"]*\\%[^'\"]*['\"]",
+          "description": "Raw SQL with string formatting - SQL injection risk",
+          "example": "User.objects.raw(\"SELECT * FROM users WHERE name = '%s'\" % name)",
+          "fix": "User.objects.raw(\"SELECT * FROM users WHERE name = %s\", [name])",
+          "category": "django_sql"
+        }
+      ]
+    },
+    "spring": {
+      "title": "Spring Framework",
+      "description": "Spring Boot and Spring Framework patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "java",
+          "pattern": "@RequestMapping(?!.*method)",
+          "description": "Use specific HTTP method annotations instead of generic @RequestMapping",
+          "example": "@RequestMapping(\"/users\")",
+          "fix": "@GetMapping(\"/users\") or @PostMapping(\"/users\")",
+          "category": "spring_specificity"
+        },
+        {
+          "type": "regex",
+          "language": "java",
+          "pattern": "@Autowired\\s+private",
+          "description": "Prefer constructor injection over field injection",
+          "example": "@Autowired private UserService userService;",
+          "fix": "Constructor injection: public MyController(UserService userService) { ... }",
+          "category": "spring_injection"
+        }
+      ]
+    }
+  },
+  "database_patterns": {
+    "sql_optimization": {
+      "title": "SQL and Database Patterns",
+      "description": "Database performance and security patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "SELECT\\s+\\*\\s+FROM",
+          "description": "Avoid SELECT * - specify needed columns",
+          "example": "SELECT * FROM users",
+          "fix": "SELECT id, name, email FROM users",
+          "category": "sql_performance"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "WHERE.*=.*OR.*=.*OR.*=",
+          "description": "Multiple OR conditions - consider using IN clause",
+          "example": "WHERE status = 'active' OR status = 'pending' OR status = 'approved'",
+          "fix": "WHERE status IN ('active', 'pending', 'approved')",
+          "category": "sql_optimization"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "await.*query.*await.*query.*await.*query",
+          "description": "Sequential database queries - consider batch operations",
+          "example": "await query1(); await query2(); await query3();",
+          "fix": "await Promise.all([query1(), query2(), query3()]);",
+          "category": "db_performance"
+        }
+      ]
+    }
+  },
+  "testing_patterns": {
+    "test_quality": {
+      "title": "Testing Best Practices",
+      "description": "Unit testing and integration testing patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "it\\([^,]*,\\s*async[^{]*\\{[^}]*(?!await)[^}]*\\}",
+          "description": "Async test without await - test may complete before assertions",
+          "example": "it('should fetch data', async () => { fetchData(); expect(data).toBe('value'); });",
+          "fix": "it('should fetch data', async () => { await fetchData(); expect(data).toBe('value'); });",
+          "category": "test_async"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "expect\\([^)]*\\)\\.toBe\\(true\\)|expect\\([^)]*\\)\\.toBe\\(false\\)",
+          "description": "Use specific matchers instead of toBe(true/false)",
+          "example": "expect(users.length > 0).toBe(true);",
+          "fix": "expect(users).toHaveLength.greaterThan(0);",
+          "category": "test_assertions"
+        }
+      ]
+    }
+  },
+  "devops_patterns": {
+    "docker": {
+      "title": "Docker Best Practices",
+      "description": "Docker and containerization patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "dockerfile",
+          "pattern": "FROM.*:latest",
+          "description": "Avoid using 'latest' tag in production Dockerfiles",
+          "example": "FROM node:latest",
+          "fix": "FROM node:18.17.0",
+          "category": "docker_versioning"
+        },
+        {
+          "type": "regex",
+          "language": "dockerfile",
+          "pattern": "RUN.*apt-get.*update(?!.*rm.*-rf.*var/lib/apt)",
+          "description": "Clean apt cache after installation to reduce image size",
+          "example": "RUN apt-get update && apt-get install -y curl",
+          "fix": "RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*",
+          "category": "docker_optimization"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "total_framework_rules": 35,
+    "supported_frameworks": [
+      "react", "vue", "angular", "express", "django", "spring", "rails"
+    ],
+    "supported_tools": [
+      "docker", "kubernetes", "jenkins", "gitlab-ci"
+    ]
+  }
+}

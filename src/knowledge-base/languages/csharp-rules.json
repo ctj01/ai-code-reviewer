@@ -1,0 +1,457 @@
+{
+  "csharp_security_rules": {
+    "sql_injection": {
+      "title": "SQL Injection Prevention",
+      "description": "Detect potential SQL injection vulnerabilities in C#",
+      "severity": "CRITICAL",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "CommandText\\s*=\\s*['\"].*\\+.*['\"]",
+          "description": "SQL command constructed with string concatenation",
+          "example": "cmd.CommandText = \"SELECT * FROM Users WHERE Id = \" + userId;",
+          "fix": "cmd.CommandText = \"SELECT * FROM Users WHERE Id = @userId\"; cmd.Parameters.AddWithValue(\"@userId\", userId);",
+          "category": "sql_injection"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "ExecuteNonQuery\\(\\).*\\+|ExecuteScalar\\(\\).*\\+|ExecuteReader\\(\\).*\\+",
+          "description": "SQL execution with concatenated strings",
+          "example": "command.ExecuteNonQuery(\"DELETE FROM users WHERE id = \" + id);",
+          "fix": "Use parameterized queries with @parameters",
+          "category": "sql_injection"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "string\\.Format\\(\\s*['\"].*SELECT.*\\{.*\\}",
+          "description": "SQL query using string.Format without parameters",
+          "example": "string.Format(\"SELECT * FROM Users WHERE Name = '{0}'\", userName);",
+          "fix": "Use parameterized queries instead of string formatting",
+          "category": "sql_injection"
+        }
+      ]
+    },
+    "deserialization": {
+      "title": "Unsafe Deserialization",
+      "description": "Detect unsafe deserialization patterns",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "BinaryFormatter\\(\\)\\.Deserialize",
+          "description": "BinaryFormatter.Deserialize is unsafe",
+          "example": "var formatter = new BinaryFormatter(); var obj = formatter.Deserialize(stream);",
+          "fix": "Use safe serializers like JsonSerializer or implement custom secure deserialization",
+          "category": "deserialization"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "JavaScriptSerializer\\(\\)\\.Deserialize",
+          "description": "JavaScriptSerializer without type validation",
+          "example": "new JavaScriptSerializer().Deserialize(json);",
+          "fix": "Use System.Text.Json with explicit type specification",
+          "category": "deserialization"
+        }
+      ]
+    },
+    "path_traversal": {
+      "title": "Path Traversal",
+      "description": "Detect path traversal vulnerabilities",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "File\\.(ReadAllText|WriteAllText|Open|Create)\\(.*\\+",
+          "description": "File operations with concatenated paths",
+          "example": "File.ReadAllText(basePath + fileName);",
+          "fix": "Use Path.Combine() and validate file paths: Path.Combine(basePath, Path.GetFileName(fileName))",
+          "category": "path_traversal"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "new\\s+FileStream\\(.*\\+",
+          "description": "FileStream with concatenated path",
+          "example": "new FileStream(directory + fileName, FileMode.Open);",
+          "fix": "Use Path.Combine and validate paths",
+          "category": "path_traversal"
+        }
+      ]
+    },
+    "crypto_weaknesses": {
+      "title": "Cryptographic Weaknesses",
+      "description": "Detect weak cryptographic implementations",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "new\\s+(MD5|SHA1)CryptoServiceProvider",
+          "description": "Weak hashing algorithms MD5/SHA1 used",
+          "example": "var hasher = new MD5CryptoServiceProvider();",
+          "fix": "Use SHA256 or higher: new SHA256CryptoServiceProvider()",
+          "category": "weak_crypto"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "DESCryptoServiceProvider|RC2CryptoServiceProvider",
+          "description": "Weak encryption algorithms DES/RC2 used",
+          "example": "var des = new DESCryptoServiceProvider();",
+          "fix": "Use AesCryptoServiceProvider for strong encryption",
+          "category": "weak_crypto"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "Random\\(\\)\\.Next\\(\\).*[Pp]assword|Random\\(\\)\\.Next\\(\\).*[Tt]oken",
+          "description": "Random() used for security-sensitive values",
+          "example": "var password = new Random().Next(100000, 999999);",
+          "fix": "Use RNGCryptoServiceProvider for cryptographically secure random values",
+          "category": "weak_crypto"
+        }
+      ]
+    }
+  },
+  "csharp_quality_rules": {
+    "naming_conventions": {
+      "title": "C# Naming Conventions",
+      "description": "Follow C# naming conventions and best practices",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "public\\s+class\\s+[a-z][a-zA-Z0-9]*",
+          "description": "Class names should start with uppercase (PascalCase)",
+          "example": "public class userService",
+          "fix": "public class UserService",
+          "category": "naming"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "public\\s+\\w+\\s+[a-z][a-zA-Z0-9]*\\s*\\(",
+          "description": "Public method names should use PascalCase",
+          "example": "public void getUserData()",
+          "fix": "public void GetUserData()",
+          "category": "naming"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "private\\s+\\w+\\s+[A-Z][a-zA-Z0-9]*\\s*[=;]",
+          "description": "Private fields should use camelCase or _camelCase",
+          "example": "private string UserName;",
+          "fix": "private string userName; or private string _userName;",
+          "category": "naming"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "const\\s+\\w+\\s+[a-z][a-zA-Z0-9]*",
+          "description": "Constants should use PascalCase or UPPER_CASE",
+          "example": "const string apiKey = \"...\";",
+          "fix": "const string ApiKey = \"...\"; or const string API_KEY = \"...\";",
+          "category": "naming"
+        }
+      ]
+    },
+    "exception_handling": {
+      "title": "Exception Handling",
+      "description": "Proper exception handling practices",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "catch\\s*\\(\\s*Exception\\s+\\w*\\s*\\)\\s*\\{\\s*\\}",
+          "description": "Empty catch block swallows all exceptions",
+          "example": "catch (Exception ex) { }",
+          "fix": "catch (Exception ex) { logger.LogError(ex, \"Error occurred\"); throw; }",
+          "category": "exception_handling"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "throw\\s+new\\s+Exception\\s*\\(",
+          "description": "Throwing generic Exception instead of specific exception",
+          "example": "throw new Exception(\"Something went wrong\");",
+          "fix": "throw new InvalidOperationException(\"Specific error message\");",
+          "category": "exception_handling"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "catch\\s*\\([^)]*\\)\\s*\\{[^}]*throw;[^}]*\\}",
+          "description": "Catch and rethrow without adding value",
+          "example": "catch (Exception ex) { throw; }",
+          "fix": "Either handle the exception or remove the catch block",
+          "category": "exception_handling"
+        }
+      ]
+    },
+    "resource_management": {
+      "title": "Resource Management",
+      "description": "Proper resource disposal and memory management",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "new\\s+(FileStream|SqlConnection|HttpClient)\\([^)]*\\)(?!.*using)",
+          "description": "IDisposable resource not wrapped in using statement",
+          "example": "var connection = new SqlConnection(connectionString);",
+          "fix": "using var connection = new SqlConnection(connectionString);",
+          "category": "resource_disposal"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.Dispose\\(\\)(?!.*finally)",
+          "description": "Manual Dispose() call without finally block",
+          "example": "stream.Dispose();",
+          "fix": "Use using statement instead of manual Dispose()",
+          "category": "resource_disposal"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "GC\\.Collect\\(\\)",
+          "description": "Manual garbage collection should be avoided",
+          "example": "GC.Collect();",
+          "fix": "Let the GC manage memory automatically, or use proper disposal patterns",
+          "category": "memory_management"
+        }
+      ]
+    },
+    "async_patterns": {
+      "title": "Async/Await Patterns",
+      "description": "Proper async/await usage in C#",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.Result(?!\\s*[;,)])",
+          "description": "Using .Result can cause deadlocks",
+          "example": "var result = asyncMethod().Result;",
+          "fix": "var result = await asyncMethod();",
+          "category": "async_deadlock"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.Wait\\(\\)",
+          "description": "Using .Wait() can cause deadlocks",
+          "example": "task.Wait();",
+          "fix": "await task;",
+          "category": "async_deadlock"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "async\\s+void\\s+(?!.*EventHandler)",
+          "description": "async void should only be used for event handlers",
+          "example": "async void ProcessData()",
+          "fix": "async Task ProcessData()",
+          "category": "async_void"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "Task\\.Run\\(\\s*\\(\\)\\s*=>\\s*await",
+          "description": "Task.Run with await is redundant",
+          "example": "Task.Run(() => await SomeAsyncMethod());",
+          "fix": "await SomeAsyncMethod();",
+          "category": "redundant_task_run"
+        }
+      ]
+    },
+    "linq_performance": {
+      "title": "LINQ Performance",
+      "description": "LINQ performance and best practices",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.Count\\(\\)\\s*[><=]\\s*0",
+          "description": "Use Any() instead of Count() > 0 for better performance",
+          "example": "if (list.Count() > 0)",
+          "fix": "if (list.Any())",
+          "category": "linq_performance"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.Where\\([^)]*\\)\\.First\\(\\)",
+          "description": "Use First(predicate) instead of Where().First()",
+          "example": "list.Where(x => x.Id == id).First()",
+          "fix": "list.First(x => x.Id == id)",
+          "category": "linq_performance"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.ToList\\(\\)\\.Count",
+          "description": "Avoid ToList().Count, use Count() directly",
+          "example": "query.ToList().Count",
+          "fix": "query.Count()",
+          "category": "linq_performance"
+        }
+      ]
+    },
+    "string_operations": {
+      "title": "String Operations",
+      "description": "Efficient string handling in C#",
+      "severity": "LOW",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "string\\s+\\w+\\s*=\\s*['\"]\\s*['\"];(\\s*\\w+\\s*\\+=)",
+          "description": "Use StringBuilder for multiple string concatenations",
+          "example": "string result = \"\"; result += item;",
+          "fix": "var sb = new StringBuilder(); sb.Append(item);",
+          "category": "string_performance"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\.ToLower\\(\\)\\s*==\\s*['\"].*['\"]",
+          "description": "Use StringComparison.OrdinalIgnoreCase for case-insensitive comparison",
+          "example": "name.ToLower() == \"admin\"",
+          "fix": "string.Equals(name, \"admin\", StringComparison.OrdinalIgnoreCase)",
+          "category": "string_comparison"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "string\\.Empty\\s*\\+",
+          "description": "Avoid concatenating with string.Empty",
+          "example": "string.Empty + value",
+          "fix": "value.ToString() or use StringBuilder",
+          "category": "string_performance"
+        }
+      ]
+    }
+  },
+  "csharp_modern_features": {
+    "nullable_reference_types": {
+      "title": "Nullable Reference Types",
+      "description": "Proper usage of nullable reference types (C# 8+)",
+      "severity": "LOW",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\w+\\?\\s+\\w+\\s*=\\s*null;.*\\w+\\.",
+          "description": "Potential null reference after assigning null to nullable type",
+          "example": "string? name = null; var length = name.Length;",
+          "fix": "Check for null: if (name != null) var length = name.Length;",
+          "category": "null_safety"
+        }
+      ]
+    },
+    "pattern_matching": {
+      "title": "Pattern Matching",
+      "description": "Modern C# pattern matching usage",
+      "severity": "LOW",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "if\\s*\\(\\s*\\w+\\s*is\\s+\\w+\\s*\\)\\s*\\{[^}]*\\(\\(\\w+\\)\\s*\\w+\\)",
+          "description": "Use pattern matching with variable declaration",
+          "example": "if (obj is string) { var str = (string)obj; }",
+          "fix": "if (obj is string str) { // use str directly }",
+          "category": "pattern_matching"
+        }
+      ]
+    },
+    "records_usage": {
+      "title": "Records Usage",
+      "description": "Proper usage of record types (C# 9+)",
+      "severity": "LOW",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "class\\s+\\w+\\s*\\{[^}]*public\\s+\\w+\\s+\\w+\\s*\\{\\s*get;\\s*set;\\s*\\}[^}]*\\}",
+          "description": "Consider using record for simple data classes",
+          "example": "class Person { public string Name { get; set; } }",
+          "fix": "record Person(string Name);",
+          "category": "modern_syntax"
+        }
+      ]
+    }
+  },
+  "csharp_web_security": {
+    "mvc_security": {
+      "title": "ASP.NET MVC Security",
+      "description": "Security best practices for ASP.NET MVC",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\[HttpPost\\](?!.*\\[ValidateAntiForgeryToken\\])",
+          "description": "POST actions should have ValidateAntiForgeryToken",
+          "example": "[HttpPost] public ActionResult Create(Model model)",
+          "fix": "[HttpPost] [ValidateAntiForgeryToken] public ActionResult Create(Model model)",
+          "category": "csrf_protection"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "Html\\.Raw\\(",
+          "description": "Html.Raw bypasses XSS protection",
+          "example": "@Html.Raw(userInput)",
+          "fix": "Use @Html.Encode() or proper validation",
+          "category": "xss_prevention"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "\\[AllowAnonymous\\].*\\[HttpPost\\]",
+          "description": "Anonymous POST endpoints may be vulnerable",
+          "example": "[AllowAnonymous] [HttpPost] public ActionResult Submit()",
+          "fix": "Ensure proper validation and rate limiting for anonymous endpoints",
+          "category": "anonymous_endpoints"
+        }
+      ]
+    },
+    "configuration_security": {
+      "title": "Configuration Security",
+      "description": "Secure configuration practices",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "ConfigurationManager\\.AppSettings\\[['\"].*[Pp]assword.*['\"]\\]",
+          "description": "Passwords should not be stored in plain text configuration",
+          "example": "ConfigurationManager.AppSettings[\"DatabasePassword\"]",
+          "fix": "Use Azure Key Vault, environment variables, or encrypted configuration",
+          "category": "secrets_management"
+        },
+        {
+          "type": "regex",
+          "language": "csharp",
+          "pattern": "connectionString.*[Pp]assword\\s*=\\s*[^;]*;",
+          "description": "Database passwords in connection strings should be secured",
+          "example": "Server=srv;Database=db;Password=123456;",
+          "fix": "Use integrated security or secure credential storage",
+          "category": "connection_security"
+        }
+      ]
+    }
+  }
+}

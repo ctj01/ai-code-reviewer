@@ -1,0 +1,366 @@
+{
+  "security_rules_extended": {
+    "input_validation": {
+      "title": "Input Validation",
+      "description": "Proper input validation and sanitization",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "req\\.(body|query|params)\\.[a-zA-Z_][a-zA-Z0-9_]*(?!\\s*&&|\\s*\\|\\||\\s*\\?)",
+          "description": "User input used without validation",
+          "example": "const userId = req.params.id; query(`SELECT * FROM users WHERE id = ${userId}`)",
+          "fix": "const userId = validateId(req.params.id); if (!userId) throw new Error('Invalid ID');",
+          "category": "input_validation"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "request\\.(POST|GET|form)\\[['\"]\\w+['\"]\\](?!\\s*and|\\s*or|\\s*if)",
+          "description": "Flask/Django input used without validation",
+          "example": "user_id = request.POST['user_id']",
+          "fix": "user_id = validate_user_id(request.POST.get('user_id'))",
+          "category": "input_validation"
+        },
+        {
+          "type": "regex",
+          "language": "java",
+          "pattern": "request\\.getParameter\\(['\"]\\w+['\"]\\)(?!\\s*!=\\s*null)",
+          "description": "Servlet parameter used without null check",
+          "example": "String userId = request.getParameter(\"userId\");",
+          "fix": "String userId = request.getParameter(\"userId\"); if (userId == null) throw new IllegalArgumentException();",
+          "category": "input_validation"
+        }
+      ]
+    },
+    "authentication_bypass": {
+      "title": "Authentication Bypass",
+      "description": "Detect potential authentication bypass vulnerabilities",
+      "severity": "CRITICAL",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "(if|&&|\\|\\|)\\s*\\w*[Pp]assword\\s*===?\\s*['\"`]['\"`]",
+          "description": "Empty password check allows bypass",
+          "example": "if (password === '') return true;",
+          "fix": "if (!password || password.length < 8) return false;",
+          "category": "auth_bypass"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "(admin|root|superuser)\\s*===?\\s*true(?!\\s*&&)",
+          "description": "Simple admin check without proper authorization",
+          "example": "if (user.admin === true) allowAccess();",
+          "fix": "if (checkAdminPermissions(user, resource)) allowAccess();",
+          "category": "auth_bypass"
+        }
+      ]
+    },
+    "crypto_weaknesses": {
+      "title": "Cryptographic Weaknesses",
+      "description": "Weak cryptographic implementations",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "crypto\\.createCipher\\(['\"`]des['\"`]",
+          "description": "DES encryption is cryptographically broken",
+          "example": "crypto.createCipher('des', key)",
+          "fix": "crypto.createCipher('aes-256-cbc', key)",
+          "category": "weak_crypto"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "Crypto\\.Cipher\\.DES|from\\s+Crypto\\.Cipher\\s+import\\s+DES",
+          "description": "DES cipher is deprecated and insecure",
+          "example": "from Crypto.Cipher import DES",
+          "fix": "from Crypto.Cipher import AES",
+          "category": "weak_crypto"
+        },
+        {
+          "type": "regex",
+          "language": "all",
+          "pattern": "\\b(md4|md2|sha0)\\b",
+          "description": "Extremely weak hash algorithms detected",
+          "example": "hashlib.new('md4')",
+          "fix": "hashlib.sha256()",
+          "category": "weak_crypto"
+        }
+      ]
+    },
+    "file_operations": {
+      "title": "Unsafe File Operations",
+      "description": "File system security issues",
+      "severity": "HIGH",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "fs\\.(readFile|writeFile|unlink)\\([^,]*req\\.(body|query|params)",
+          "description": "File operation using user input - path traversal risk",
+          "example": "fs.readFile(req.query.filename, callback)",
+          "fix": "const safePath = path.normalize(req.query.filename); if (!safePath.startsWith('/safe/')) throw error;",
+          "category": "file_traversal"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "open\\([^,]*request\\.(POST|GET|form)",
+          "description": "File opened with user-controlled path",
+          "example": "open(request.POST['file_path'])",
+          "fix": "safe_path = secure_filename(request.POST['file_path']); open(safe_path)",
+          "category": "file_traversal"
+        }
+      ]
+    }
+  },
+  "code_quality_extended": {
+    "resource_management": {
+      "title": "Resource Management",
+      "description": "Proper resource handling and cleanup",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "setInterval\\([^,]+,[^)]+\\)(?![^;]*clearInterval)",
+          "description": "setInterval without clearInterval can cause memory leaks",
+          "example": "setInterval(updateData, 1000);",
+          "fix": "const interval = setInterval(updateData, 1000); // Later: clearInterval(interval);",
+          "category": "memory_leak"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "open\\([^)]+\\)(?!.*with\\s+)",
+          "description": "File opened without context manager",
+          "example": "file = open('data.txt', 'r')",
+          "fix": "with open('data.txt', 'r') as file:",
+          "category": "resource_leak"
+        },
+        {
+          "type": "regex",
+          "language": "java",
+          "pattern": "new\\s+(FileInputStream|FileOutputStream|BufferedReader)\\([^)]+\\)(?!.*try)",
+          "description": "Resource not managed with try-with-resources",
+          "example": "FileInputStream fis = new FileInputStream(file);",
+          "fix": "try (FileInputStream fis = new FileInputStream(file)) { ... }",
+          "category": "resource_leak"
+        }
+      ]
+    },
+    "async_patterns": {
+      "title": "Asynchronous Programming",
+      "description": "Best practices for async/await and promises",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "async\\s+function[^{]*\\{[^}]*(?!await)[^}]*\\}",
+          "description": "Async function without await - consider if async is needed",
+          "example": "async function getData() { return data; }",
+          "fix": "function getData() { return data; } // or add await if needed",
+          "category": "unnecessary_async"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "await.*await.*await",
+          "description": "Sequential awaits - consider Promise.all for parallel execution",
+          "example": "const a = await getA(); const b = await getB(); const c = await getC();",
+          "fix": "const [a, b, c] = await Promise.all([getA(), getB(), getC()]);",
+          "category": "sequential_await"
+        }
+      ]
+    },
+    "data_structures": {
+      "title": "Data Structure Optimization",
+      "description": "Efficient use of data structures",
+      "severity": "LOW",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "\\[\\]\\.indexOf\\([^)]+\\)\\s*!==?\\s*-1",
+          "description": "Use includes() instead of indexOf() !== -1",
+          "example": "if (array.indexOf(item) !== -1)",
+          "fix": "if (array.includes(item))",
+          "category": "array_optimization"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "\\w+\\s*in\\s*\\[.*\\]",
+          "description": "Use set for membership testing instead of list",
+          "example": "if item in [1, 2, 3, 4, 5]:",
+          "fix": "VALID_ITEMS = {1, 2, 3, 4, 5}; if item in VALID_ITEMS:",
+          "category": "set_optimization"
+        }
+      ]
+    },
+    "modern_syntax": {
+      "title": "Modern Language Features",
+      "description": "Use modern language features for better code",
+      "severity": "LOW",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "Object\\.keys\\([^)]+\\)\\.map\\(\\w+\\s*=>\\s*\\w+\\[[^\\]]+\\]\\)",
+          "description": "Use Object.values() instead of Object.keys().map()",
+          "example": "Object.keys(obj).map(key => obj[key])",
+          "fix": "Object.values(obj)",
+          "category": "object_methods"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "\\w+\\.substr\\(",
+          "description": "substr() is deprecated, use substring() or slice()",
+          "example": "str.substr(1, 3)",
+          "fix": "str.substring(1, 4) or str.slice(1, 4)",
+          "category": "deprecated_methods"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "\\%\\s*\\([^)]+\\)",
+          "description": "Use f-strings instead of % formatting",
+          "example": "\"Hello %s\" % name",
+          "fix": "f\"Hello {name}\"",
+          "category": "string_formatting"
+        }
+      ]
+    },
+    "accessibility": {
+      "title": "Accessibility",
+      "description": "Web accessibility best practices",
+      "severity": "MEDIUM",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "<img[^>]*(?!.*alt=)[^>]*>",
+          "description": "Image without alt attribute",
+          "example": "<img src=\"photo.jpg\">",
+          "fix": "<img src=\"photo.jpg\" alt=\"Description of photo\">",
+          "category": "a11y"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "<button[^>]*onclick[^>]*>",
+          "description": "Button with inline onclick - use addEventListener for better accessibility",
+          "example": "<button onclick=\"doSomething()\">Click</button>",
+          "fix": "<button id=\"myBtn\">Click</button> + addEventListener",
+          "category": "a11y"
+        }
+      ]
+    }
+  },
+  "language_specific_extended": {
+    "javascript_advanced": {
+      "title": "Advanced JavaScript Patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "!!\\w+",
+          "description": "Double negation for boolean conversion - use explicit Boolean()",
+          "example": "const isValid = !!value;",
+          "fix": "const isValid = Boolean(value);",
+          "category": "explicit_conversion"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "JSON\\.parse\\([^)]+\\)(?![^;]*catch)",
+          "description": "JSON.parse without try-catch can throw unexpected errors",
+          "example": "const data = JSON.parse(response);",
+          "fix": "try { const data = JSON.parse(response); } catch (e) { ... }",
+          "category": "error_handling"
+        },
+        {
+          "type": "regex",
+          "language": "javascript",
+          "pattern": "parseInt\\([^,)]+\\)(?!,\\s*10)",
+          "description": "parseInt without radix parameter",
+          "example": "parseInt(userInput)",
+          "fix": "parseInt(userInput, 10)",
+          "category": "radix_parameter"
+        }
+      ]
+    },
+    "python_advanced": {
+      "title": "Advanced Python Patterns",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "\\w+\\s*=\\s*\\[\\](?=.*\\w+\\.append)",
+          "description": "List append in loop - consider list comprehension",
+          "example": "results = []; for item in items: results.append(process(item))",
+          "fix": "results = [process(item) for item in items]",
+          "category": "comprehension"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "range\\(len\\(\\w+\\)\\)",
+          "description": "Use enumerate() instead of range(len())",
+          "example": "for i in range(len(items)): print(i, items[i])",
+          "fix": "for i, item in enumerate(items): print(i, item)",
+          "category": "enumerate"
+        },
+        {
+          "type": "regex",
+          "language": "python",
+          "pattern": "lambda\\s+\\w+:\\s*\\w+\\.[a-zA-Z_]\\w*",
+          "description": "Simple lambda can be replaced with method reference",
+          "example": "map(lambda x: x.strip(), items)",
+          "fix": "map(str.strip, items)",
+          "category": "method_reference"
+        }
+      ]
+    },
+    "java_patterns": {
+      "title": "Java Best Practices",
+      "patterns": [
+        {
+          "type": "regex",
+          "language": "java",
+          "pattern": "new\\s+ArrayList\\(\\)(?![^;]*<)",
+          "description": "Use diamond operator or specify generic type",
+          "example": "List list = new ArrayList();",
+          "fix": "List<String> list = new ArrayList<>();",
+          "category": "generics"
+        },
+        {
+          "type": "regex",
+          "language": "java",
+          "pattern": "\\.equals\\([^)]+\\)(?!.*Objects\\.equals)",
+          "description": "Use Objects.equals() to avoid NullPointerException",
+          "example": "str1.equals(str2)",
+          "fix": "Objects.equals(str1, str2)",
+          "category": "null_safety"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "last_updated": "2025-01-20",
+    "total_rules": 75,
+    "new_categories": [
+      "input_validation", "auth_bypass", "weak_crypto", "file_traversal",
+      "memory_leak", "resource_leak", "async_patterns", "data_optimization",
+      "modern_syntax", "accessibility", "advanced_patterns"
+    ]
+  }
+}

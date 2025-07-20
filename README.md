@@ -1,166 +1,169 @@
-
 # AI Code Reviewer
 
-A GitHub pull-request reviewer powered by OpenAI and multiple linters.  
-Provides inline suggestions, summary comments, dynamic rule configuration, and a small metrics dashboard.
-
-## Features
-
-- **Multi-language linting**: ESLint (JS/TS), Flake8 (Python), dotnet-format (C#), Checkstyle (Java)  
-- **Dynamic rule configuration**: adjust rules via `config/linterRules.json` without code changes  
-- **AI-powered code review**: GPT-4 analyzes diffs and suggests readability, design, security, and style improvements  
-- **Inline & summary comments**: posts feedback inline when the diff covers the line, or a summary fallback  
-- **CLI mode**: run locally or in CI to generate `review-report.json`  
-- **Metrics dashboard**: React component (`Dashboard.jsx`) visualizes comments by language and severity  
-- **GitHub Actions integration**: automated PR review in your CI pipeline
+A comprehensive solution for AI-powered code reviews, combining an Express-based API and a Visual Studio Code extension.
 
 ---
 
-## Getting Started
+## Table of Contents
 
-### 1. Clone the repo
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Prerequisites](#prerequisites)
+4. [Local Setup](#local-setup)
 
-```bash
-git clone https://github.com/your-org/ai-code-reviewer.git
-cd ai-code-reviewer
-````
+   * [API (Express)](#api-express)
+   * [Extension (VS Code)](#extension-vs-code)
+5. [Configuration](#configuration)
+6. [Usage](#usage)
+7. [Deployment](#deployment)
 
-### 2. Install dependencies
+   * [Deploy API to Render](#deploy-api-to-render)
+8. [Publishing the Extension](#publishing-the-extension)
+9. [License](#license)
 
-```bash
-npm install
+---
+
+## Overview
+
+This project provides:
+
+* **API (Express)**: A server that receives code snippets, forwards them to OpenAI for analysis (style review or OWASP Top 10 security review), and returns structured JSON suggestions.
+* **VS Code Extension**: Seamless integration into Visual Studio Code, allowing developers to select code and invoke AI-driven reviews directly from the editor.
+
+---
+
+## Architecture
+
+```
++----------------------+      +-------------------------+
+| VS Code Extension    | <--> | Express API             |
+| - Sends selected code|      | - Receives snippet      |
+|   + OpenAI API Key   |      | - Calls OpenAI with key |
+| - Displays feedback  |      | - Returns JSON          |
++----------------------+      +-------------------------+
 ```
 
-Make sure you have the following installed on your PATH:
+Optional: Deploy the API to a serverless platform (e.g., Render) for public access.
 
-* Node.js ≥16
-* Python + flake8
-* .NET SDK (for `dotnet format`)
-* Java + Checkstyle CLI
+---
 
-### 3. Configure secrets
+## Prerequisites
 
-Create a `.env` file (or set environment variables) with:
+* **Node.js** v14+ installed
+* **npm** or **yarn**
+* **Visual Studio Code**
+* OpenAI account with API Key
 
-```ini
-OPENAI_API_KEY=sk-...
-GITHUB_TOKEN=ghp_...
-```
+---
+
+## Local Setup
+
+### API (Express)
+
+1. Navigate to project root:
+
+   ```bash
+   cd ai-code-reviewer
+   ```
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+3. Start the server:
+
+   ```bash
+   npm start
+   ```
+4. The API listens on [http://localhost:3000](http://localhost:3000). Endpoints:
+
+   * `POST /review`           (style & best practices)
+   * `POST /owasp-review`     (OWASP Top 10 security)
+
+### Extension (VS Code)
+
+1. Open the `extension/` folder:
+
+   ```bash
+   cd extension
+   ```
+2. Install dev dependencies:
+
+   ```bash
+   npm install
+   ```
+3. Compile TypeScript:
+
+   ```bash
+   npm run compile
+   ```
+4. Launch Extension Development Host in VS Code:
+
+   * Open `extension/` in VS Code.
+   * Press **F5** to start debugging.
 
 ---
 
 ## Configuration
 
-Create or edit `config/linterRules.json`:
+In VS Code settings (`Ctrl+,`), search for **AI Code Reviewer**:
 
-```json
-{
-  "eslint": {
-    "enabled": true,
-    "rules": {
-      "no-console": "warn",
-      "eqeqeq": "error"
-    }
-  },
-  "flake8": {
-    "enabled": true,
-    "ignore": ["E203", "W503"]
-  },
-  "dotnetFormat": {
-    "enabled": true,
-    "severity": "warning",
-    "reportFile": "lint-report.json"
-  },
-  "checkstyle": {
-    "enabled": true,
-    "configFile": "./config/google_checks.xml"
-  }
-}
-```
+* **AI Code Reviewer › Endpoint**: URL for style review API (default `http://localhost:3000/review`).
+* **AI Code Reviewer › Owasp Endpoint**: URL for security review API (default `http://localhost:3000/owasp-review`).
+
+When invoking a review, the extension prompts once for your **OpenAI API Key** and stores it securely.
 
 ---
 
 ## Usage
 
-### CLI mode
+1. Open a code file in the Extension Host.
+2. Select a snippet.
+3. Open the Command Palette (`Ctrl+Shift+P`).
+4. Run one of the commands:
 
-```bash
-node src/cli.js --payload path/to/payload.json --repo path/to/clone
-```
-
-This generates `review-report.json` with all suggested comments.
-
-### Server / Webhook mode
-
-```bash
-npm start
-# Listens on http://localhost:3000
-```
-
-Configure your GitHub webhook to POST `pull_request` events to `/webhook`.
+   * **AI Code Review: Style & Best Practices**
+   * **AI Security Review (OWASP)**
+5. View results in the side panel Webview.
 
 ---
 
-## GitHub Actions
+## Deployment
 
-Example workflow (`.github/workflows/ai-review.yml`):
+### Deploy API to Render
 
-```yaml
-name: AI Code Review
-
-on: pull_request
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-      - run: npm ci
-      - name: Run AI Review CLI
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git clone https://github.com/${{ github.repository }} tmp/repo
-          node src/cli.js --payload <(echo '${{ toJson(github.event) }}') --repo tmp/repo
-      - name: Post Comments
-        run: node scripts/postComments.js review-report.json
-```
+1. Push your code to GitHub.
+2. In Render dashboard, create a new **Web Service**.
+3. Connect your repo and select branch `main`.
+4. Set **Build Command** to `npm install` and **Start Command** to `npm start`.
+5. Choose the **Free** plan.
+6. Deploy and copy the public URL (e.g., `https://<your-service>.onrender.com`).
+7. Update extension settings to point to this URL.
 
 ---
 
-## Metrics Dashboard
+## Publishing the Extension
 
-Install Recharts:
+1. Install `vsce`:
 
-```bash
-npm install recharts
-```
+   ```bash
+   npm install -g vsce
+   ```
+2. In `extension/`, bump version in `package.json`.
+3. Publish package:
 
-Render `<Dashboard />` in your React app. It reads `public/review-report.json` and shows:
+   ```bash
+   vsce package
+   vsce publish
+   ```
+4. Users can install via Marketplace or:
 
-* Total number of comments
-* Bar chart by file extension (language)
-* Pie chart by severity
-
----
-
-## Contributing
-
-1. Fork the repo
-2. Create a feature branch
-3. Run linters & tests
-4. Submit a Pull Request
+   ```bash
+   code --install-extension <publisher>.ai-code-reviewer-extension
+   ```
 
 ---
 
 ## License
 
-MIT © Cristian Mendoza
-
-```
-```
+This project is released under the **MIT License**. See [LICENSE](LICENSE) for details.
