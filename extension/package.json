@@ -1,26 +1,36 @@
 {
   "name": "ai-code-reviewer-extension",
-  "displayName": "AI Code Reviewer",
-  "publisher": "Ctj01",
-  "version": "0.0.1",
+  "displayName": "AI Code Reviewer(ictj01)",
+  "publisher": "ictj01",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.50.0"
   },
-  "description": "VS Code extension for AI-powered code review and OWASP security analysis.",
+  "description": "VS Code extension for AI-powered code review with local analysis engine. No API keys required!",
   "main": "./out/extension.js",
   "activationEvents": [
     "onCommand:aiReviewer.reviewSelection",
-    "onCommand:aiReviewer.owaspReview"
+    "onCommand:aiReviewer.owaspReview",
+    "onCommand:aiReviewer.clearDiagnostics"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ctj01/ai-code-reviewer"
+  },
+  "icon": "icon.png",
   "contributes": {
     "commands": [
       {
         "command": "aiReviewer.reviewSelection",
-        "title": "AI Code Review: Style & Best Practices"
+        "title": "🔍 AI Code Review (Quality + Security)"
       },
       {
         "command": "aiReviewer.owaspReview",
-        "title": "AI Security Review (OWASP)"
+        "title": "🛡️ AI Security Review (OWASP)"
+      },
+      {
+        "command": "aiReviewer.clearDiagnostics",
+        "title": "🧹 Clear AI Review Results"
       }
     ],
     "configuration": {
@@ -28,13 +38,18 @@
       "properties": {
         "aiReviewer.endpoint": {
           "type": "string",
-          "default": "http://localhost:3000/review",
-          "description": "URL of the code review (style) endpoint"
+          "default": "https://ai-code-reviewer-2b4k.onrender.com/review",
+          "description": "URL of the unified code review endpoint (handles both quality and security analysis)"
         },
-        "aiReviewer.owaspEndpoint": {
-          "type": "string",
-          "default": "http://localhost:3000/owasp-review",
-          "description": "URL of the OWASP security review endpoint"
+        "aiReviewer.autoReview": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run code review when files are saved"
+        },
+        "aiReviewer.maxIssuesPerFile": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of issues to show per file"
         }
       }
     }

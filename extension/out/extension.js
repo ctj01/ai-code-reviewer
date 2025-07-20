@@ -35,101 +35,192 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deactivate = exports.activate = void 0;
 // File: src/extension.ts
 const vscode = __importStar(require("vscode"));
-function activate(context) {
-    const secretStorage = context.secrets;
-    const config = vscode.workspace.getConfiguration('aiReviewer');
-    // Helper to get or prompt for API key
-    function getApiKey() {
-        return __awaiter(this, void 0, void 0, function* () {
-            let apiKey = yield secretStorage.get('openaiKey');
-            if (!apiKey) {
-                apiKey = yield vscode.window.showInputBox({
-                    prompt: 'Enter your OpenAI API Key',
-                    ignoreFocusOut: true,
-                    password: true
-                });
-                if (apiKey) {
-                    yield secretStorage.store('openaiKey', apiKey);
-                    vscode.window.showInformationMessage('API Key saved securely');
-                }
-            }
-            return apiKey;
-        });
+/**
+ * Sends a POST request to the unified review endpoint with the code payload.
+ * No longer requires OpenAI API key since we use local analysis.
+ */
+function postCodeForReview(endpoint, code, language) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const resp = yield fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code,
+                    language: language || 'javascript',
+                    options: {
+                        includeMetrics: true,
+                        includeSecurity: true,
+                        includeQuality: true
+                    }
+                })
+            });
+            return resp;
+        }
+        catch (err) {
+            vscode.window.showErrorMessage(`Error calling review service: ${err}`);
+            return;
+        }
+    });
+}
+/**
+ * Detects the programming language based on file extension
+ */
+function detectLanguage(document) {
+    var _a;
+    const extension = (_a = document.fileName.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase();
+    const languageMap = {
+        'js': 'javascript',
+        'jsx': 'javascript',
+        'ts': 'typescript',
+        'tsx': 'typescript',
+        'py': 'python',
+        'java': 'java',
+        'cs': 'csharp',
+        'cpp': 'cpp',
+        'c': 'c',
+        'php': 'php',
+        'go': 'go',
+        'rs': 'rust',
+        'rb': 'ruby'
+    };
+    return languageMap[extension || ''] || 'javascript';
+}
+/**
+ * Creates diagnostic items from review results
+ */
+function createDiagnostics(issues) {
+    return issues.map(issue => {
+        const line = Math.max(0, (issue.line || 1) - 1);
+        const column = Math.max(0, (issue.column || 1) - 1);
+        const range = new vscode.Range(new vscode.Position(line, column), new vscode.Position(line, column + 10) // Highlight ~10 characters
+        );
+        const severity = getSeverityLevel(issue.severity);
+        const diagnostic = new vscode.Diagnostic(range, issue.message, severity);
+        diagnostic.source = 'AI Code Reviewer';
+        diagnostic.code = {
+            value: issue.categoryKey || issue.category || 'general',
+            target: vscode.Uri.parse('https://github.com/ctj01/ai-code-reviewer')
+        };
+        // Add related information if available
+        if (issue.fix) {
+            diagnostic.relatedInformation = [
+                new vscode.DiagnosticRelatedInformation(new vscode.Location(vscode.window.activeTextEditor.document.uri, range), `💡 Suggestion: ${issue.fix}`)
+            ];
+        }
+        return diagnostic;
+    });
+}
+/**
+ * Maps severity strings to VSCode diagnostic severity levels
+ */
+function getSeverityLevel(severity) {
+    switch (severity === null || severity === void 0 ? void 0 : severity.toUpperCase()) {
+        case 'CRITICAL':
+        case 'HIGH':
+            return vscode.DiagnosticSeverity.Error;
+        case 'MEDIUM':
+            return vscode.DiagnosticSeverity.Warning;
+        case 'LOW':
+            return vscode.DiagnosticSeverity.Information;
+        default:
+            return vscode.DiagnosticSeverity.Hint;
     }
-    // Command: AI Code Review (style)
-    const styleCmd = vscode.commands.registerCommand('aiReviewer.reviewSelection', () => __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        const apiKey = yield getApiKey();
-        if (!apiKey)
-            return;
+}
+/**
+ * Shows a summary of the review results
+ */
+function showReviewSummary(data) {
+    const summary = data.summary || {};
+    const totalIssues = summary.totalIssues || data.length;
+    const criticalCount = summary.criticalIssues || 0;
+    const highCount = summary.highSeverityIssues || 0;
+    let message = `🔍 AI Code Review Complete: ${totalIssues} issues found`;
+    if (criticalCount > 0) {
+        message += ` (${criticalCount} critical, ${highCount} high severity)`;
+    }
+    else if (highCount > 0) {
+        message += ` (${highCount} high severity)`;
+    }
+    if (totalIssues === 0) {
+        vscode.window.showInformationMessage('✅ No issues found! Code looks good.');
+    }
+    else if (criticalCount > 0 || highCount > 0) {
+        vscode.window.showWarningMessage(message);
+    }
+    else {
+        vscode.window.showInformationMessage(message);
+    }
+}
+function activate(context) {
+    const config = vscode.workspace.getConfiguration('aiReviewer');
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('aiCodeReviewer');
+    context.subscriptions.push(diagnosticCollection);
+    // Unified review command that handles both quality and security
+    const runUnifiedReview = () => __awaiter(this, void 0, void 0, function* () {
         const editor = vscode.window.activeTextEditor;
-        if (!editor)
+        if (!editor) {
             return vscode.window.showWarningMessage('Open a file and select some code first');
-        const code = editor.document.getText(editor.selection);
-        if (!code.trim())
-            return vscode.window.showWarningMessage('Please select a non-empty code snippet');
-        const endpoint = config.get('endpoint') || 'http://localhost:3000/review';
-        let resp;
-        try {
-            resp = yield fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({ code })
-            });
         }
-        catch (err) {
-            return vscode.window.showErrorMessage(`Error calling review service: ${err}`);
+        const selection = editor.selection;
+        const code = selection.isEmpty
+            ? editor.document.getText() // Review entire file if no selection
+            : editor.document.getText(selection);
+        if (!code.trim()) {
+            return vscode.window.showWarningMessage('Please select a non-empty code snippet or open a file with content');
         }
-        if (!resp.ok)
-            return vscode.window.showErrorMessage(`Review service returned ${resp.status}`);
-        const comments = yield resp.json();
-        const panel = vscode.window.createWebviewPanel('aiReview', 'AI Code Review', vscode.ViewColumn.Beside, { enableScripts: false });
-        const html = [`<html><body><h3>Style & Best Practices</h3><ul>`];
-        for (const c of comments) {
-            html.push(`<li><b>Line ${(_a = c.line) !== null && _a !== void 0 ? _a : '-'}:</b> ${c.message}</li>`);
-        }
-        html.push('</ul></body></html>');
-        panel.webview.html = html.join('');
+        const language = detectLanguage(editor.document);
+        const endpoint = config.get('endpoint');
+        // Show progress indicator
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "AI Code Review in progress...",
+            cancellable: false
+        }, (progress) => __awaiter(this, void 0, void 0, function* () {
+            progress.report({ increment: 0 });
+            const resp = yield postCodeForReview(endpoint, code, language);
+            progress.report({ increment: 50 });
+            if (!resp || !resp.ok) {
+                return vscode.window.showErrorMessage(`Code review service returned ${resp === null || resp === void 0 ? void 0 : resp.status}`);
+            }
+            const data = yield resp.json();
+            progress.report({ increment: 100 });
+            // Clear previous diagnostics for this document
+            diagnosticCollection.delete(editor.document.uri);
+            // Create and set new diagnostics
+            const issues = data.issues || data;
+            if (Array.isArray(issues) && issues.length > 0) {
+                const diagnostics = createDiagnostics(issues);
+                diagnosticCollection.set(editor.document.uri, diagnostics);
+            }
+            // Show summary
+            showReviewSummary(data);
+        }));
+    });
+    // Register the unified review command
+    context.subscriptions.push(vscode.commands.registerCommand('aiReviewer.reviewSelection', runUnifiedReview));
+    // Keep the OWASP command for backward compatibility but make it use the same endpoint
+    context.subscriptions.push(vscode.commands.registerCommand('aiReviewer.owaspReview', runUnifiedReview));
+    // Command to clear all diagnostics
+    context.subscriptions.push(vscode.commands.registerCommand('aiReviewer.clearDiagnostics', () => {
+        diagnosticCollection.clear();
+        vscode.window.showInformationMessage('AI Code Review diagnostics cleared');
     }));
-    context.subscriptions.push(styleCmd);
-    // Command: AI Security Review (OWASP)
-    const secCmd = vscode.commands.registerCommand('aiReviewer.owaspReview', () => __awaiter(this, void 0, void 0, function* () {
-        var _b;
-        const apiKey = yield getApiKey();
-        if (!apiKey)
-            return;
-        const editor = vscode.window.activeTextEditor;
-        if (!editor)
-            return vscode.window.showWarningMessage('Open a file and select some code first');
-        const code = editor.document.getText(editor.selection);
-        if (!code.trim())
-            return vscode.window.showWarningMessage('Please select a non-empty code snippet');
-        const endpoint = config.get('owaspEndpoint') || 'http://localhost:3000/owasp-review';
-        let resp;
-        try {
-            resp = yield fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({ code })
-            });
+    // Auto-clear diagnostics when document is modified significantly
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
+        if (event.contentChanges.length > 0) {
+            // Clear diagnostics after a short delay to avoid flickering
+            setTimeout(() => {
+                diagnosticCollection.delete(event.document.uri);
+            }, 2000);
         }
-        catch (err) {
-            return vscode.window.showErrorMessage(`Error calling OWASP review service: ${err}`);
-        }
-        if (!resp.ok)
-            return vscode.window.showErrorMessage(`OWASP service returned ${resp.status}`);
-        const findings = yield resp.json();
-        const panel = vscode.window.createWebviewPanel('owaspReview', 'AI Security Review', vscode.ViewColumn.Beside, { enableScripts: false });
-        const html = ['<html><body><h3>Security Findings (OWASP Top 10)</h3><ul>'];
-        for (const f of findings) {
-            html.push(`<li><b>${f.category}</b> (Line ${(_b = f.line) !== null && _b !== void 0 ? _b : '-'}): ${f.message}</li>`);
-        }
-        html.push('</ul></body></html>');
-        panel.webview.html = html.join('');
     }));
-    context.subscriptions.push(secCmd);
 }
 exports.activate = activate;
-function deactivate() { }
+function deactivate() {
+    // no cleanup needed
+}
 exports.deactivate = deactivate;
 //# sourceMappingURL=extension.js.map
